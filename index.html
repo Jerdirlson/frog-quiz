@@ -265,7 +265,7 @@ const FAN_TOP =[70,165,240,165,70]; // px above bandTop (arc: center highest)
 const FAN_MAX =Math.max(...FAN_TOP);
 
 /* ===== state ===== */
-let currentLevel=0, lives=2, locked=true, timeLeft=300, timerId=null;
+let currentLevel=0, lives=2, locked=true, timeLeft=300, timerId=null, attempts=0;
 let clusterPads=[], frogRestPad=null, appScale=1;
 const $=id=>document.getElementById(id);
 const world=$('world'), frog=$('frog'), startPad=$('startPad'), goal=$('goal');
@@ -334,7 +334,7 @@ function activateLevel(i,pop){
 /* ===== game flow ===== */
 function startGame(){
   $('start').classList.add('hidden'); $('end').classList.add('hidden');
-  lives=2; currentLevel=0; timeLeft=300; locked=false;
+  lives=2; currentLevel=0; timeLeft=300; locked=false; attempts=0;
   $('lives').textContent=lives; $('crossed').textContent='0';
   clearBanner();
   buildWorld();
@@ -375,6 +375,7 @@ function triggerWater(screenX){
 function choose(level,k,padEl){
   if(locked||level!==currentLevel)return;
   locked=true;
+  attempts++;
   clusterPads[level].forEach(b=>b.disabled=true);
   const correct=QUESTIONS[level].answer;
   const b=$('banner');
@@ -427,8 +428,14 @@ function endGame(result){
   clearInterval(timerId); locked=true;
   clusterPads.forEach(row=>row.forEach(b=>b.disabled=true));
   const e=$('end');
-  if(result==='win'){$('endEmoji').textContent='🏆';$('endTitle').textContent='You reached the far bank!';
-    $('endMsg').innerHTML='🌟 The frog crossed the whole river <strong>completely dry</strong>. You know the AI Legal Assistant project!';}
+  if(result==='win'){
+    const elapsed=300-timeLeft, tm=Math.floor(elapsed/60), ts=elapsed%60;
+    const timeStr=tm+':'+String(ts).padStart(2,'0');
+    const mistakes=attempts-LEVELS;
+    const accuracy=mistakes<=0?'a perfect run!':(mistakes+' mistake'+(mistakes===1?'':'s'));
+    $('endEmoji').textContent='🏆';$('endTitle').textContent='You reached the far bank!';
+    $('endMsg').innerHTML='🌟 The frog crossed the whole river! You know the AI Legal Assistant project.'+
+      `<br><br>⏱️ <strong>Time:</strong> ${timeStr}&nbsp;&nbsp;·&nbsp;&nbsp;🎯 <strong>Attempts:</strong> ${attempts} <span style="opacity:.85">(${accuracy})</span>`;}
   else if(result==='lose'){$('endEmoji').textContent='💧';$('endTitle').textContent='Game Over';
     $('endMsg').innerHTML='The frog ran out of lives and got soaked. 🐸💦<br>Review and try crossing again!';}
   else{$('endEmoji').textContent='⏰';$('endTitle').textContent="Time's up!";

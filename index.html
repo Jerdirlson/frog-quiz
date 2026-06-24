@@ -18,7 +18,7 @@
     min-height:100vh;display:flex;align-items:center;justify-content:center;
     padding:24px 12px;color:var(--ink);
   }
-  .app{width:100%;max-width:760px;border-radius:20px;overflow:hidden;
+  .app{width:760px;border-radius:20px;overflow:hidden;transform-origin:center center;
     box-shadow:0 22px 60px rgba(0,0,0,.45);background:#fff}
 
   /* top bar */
@@ -120,7 +120,6 @@
     background:var(--bar);padding:3px 10px;border-radius:14px 0 12px 0}
   .qtext{font-size:1.08rem;font-weight:bold;line-height:1.3;color:#1d2b1a}
   .tag{display:inline-block;font-size:.66rem;background:var(--leaf);color:#fff;padding:2px 9px;border-radius:20px;margin-left:6px;vertical-align:middle}
-  @media(max-width:560px){.qtext{font-size:.96rem}.leaf{height:140px}.leaf .pad{font-size:.72rem;padding:10px 8px}.leaf .badge{width:32px;height:32px;font-size:1rem}}
 
   .banner{position:absolute;left:50%;top:92px;transform:translateX(-50%);z-index:19;min-width:60%;max-width:90%;
     text-align:center;padding:11px 18px;border-radius:16px;font-weight:bold;font-size:.94rem;display:none;box-shadow:0 8px 20px rgba(0,0,0,.35)}
@@ -267,7 +266,7 @@ const FAN_MAX =Math.max(...FAN_TOP);
 
 /* ===== state ===== */
 let currentLevel=0, lives=2, locked=true, timeLeft=300, timerId=null;
-let clusterPads=[], frogRestPad=null;
+let clusterPads=[], frogRestPad=null, appScale=1;
 const $=id=>document.getElementById(id);
 const world=$('world'), frog=$('frog'), startPad=$('startPad'), goal=$('goal');
 
@@ -356,8 +355,8 @@ function updateTimer(){const m=Math.floor(timeLeft/60),s=timeLeft%60;
 function hopFrog(padEl){
   frog.classList.remove('idle');
   const fr=frog.getBoundingClientRect(), pr=padEl.getBoundingClientRect();
-  const dx=(pr.left+pr.width/2)-(fr.left+fr.width/2);
-  const dy=(pr.top+pr.height*0.30)-(fr.top+fr.height/2);
+  const dx=((pr.left+pr.width/2)-(fr.left+fr.width/2))/appScale;
+  const dy=((pr.top+pr.height*0.30)-(fr.top+fr.height/2))/appScale;
   const end=`translate(${dx}px,${dy}px) scale(.92)`;
   const a=frog.animate([
     {transform:'translate(0,0) scale(1)'},
@@ -406,7 +405,7 @@ function choose(level,k,padEl){
         {transform:`translate(${dx*0.5}px,180px) rotate(430deg)`,opacity:0}
       ],{duration:720,easing:'ease-in',fill:'forwards'});
       const pr=padEl.getBoundingClientRect(), pondR=$('pond').getBoundingClientRect();
-      triggerWater(pr.left+pr.width/2-pondR.left);
+      triggerWater((pr.left+pr.width/2-pondR.left)/appScale);
       setTimeout(()=>{
         if(lives<=0){ endGame('lose'); return; }
         b.innerHTML+=`<br>🐸 ${lives} life${lives===1?'':'s'} left — try again!`;
@@ -438,6 +437,19 @@ function endGame(result){
 }
 
 function resetGame(){$('end').classList.add('hidden');$('start').classList.remove('hidden');}
+
+/* scale the whole game to fill the screen while keeping its aspect ratio */
+function fitApp(){
+  const app=document.querySelector('.app');
+  app.style.transform='none';
+  const w=app.offsetWidth, h=app.offsetHeight;
+  const s=Math.min((window.innerWidth-24)/w, (window.innerHeight-24)/h);
+  appScale=s;
+  app.style.transform='scale('+s+')';
+}
+window.addEventListener('resize',fitApp);
+window.addEventListener('orientationchange',fitApp);
+fitApp();
 </script>
 </body>
 </html>

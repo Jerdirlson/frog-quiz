@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Frog River · AI Legal Assistant</title>
+<style>
+  :root{
+    --bar:#5fbb2e; --bar-dark:#4a9e22;
+    --leaf:#3f8b2c; --leaf-light:#5cae3f; --leaf-dark:#2c6b1e;
+    --water1:#3cc0ef; --water2:#1c7fc0; --water3:#14618f;
+    --gold:#ffd54a; --wrong:#e74c3c; --right:#2ecc71; --ink:#1b3a2b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Baloo 2','Comic Sans MS','Trebuchet MS',system-ui,sans-serif;
+    background:radial-gradient(circle at 50% 0%,#2a8fc0,#155a86 70%);
+    min-height:100vh;display:flex;align-items:flex-start;justify-content:center;
+    padding:18px 12px 50px;color:var(--ink);
+  }
+  .app{width:100%;max-width:660px;border-radius:20px;overflow:hidden;
+    box-shadow:0 22px 60px rgba(0,0,0,.45);background:#fff}
+
+  /* top bar */
+  .topbar{background:linear-gradient(180deg,#73d23f,var(--bar) 55%,var(--bar-dark));
+    color:#fff;display:flex;align-items:center;justify-content:space-between;
+    padding:11px 16px;font-weight:bold;box-shadow:0 3px 8px rgba(0,0,0,.2);position:relative;z-index:30}
+  .logo{display:flex;align-items:center;gap:8px;font-size:1.18rem;text-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .logo .dot{background:#fff;color:var(--bar-dark);width:28px;height:28px;border-radius:50%;
+    display:grid;place-items:center;font-size:1.15rem;box-shadow:0 2px 4px rgba(0,0,0,.25)}
+  .title{font-size:.92rem;opacity:.95;text-align:center;flex:1;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .stats{display:flex;align-items:center;gap:12px;font-size:1rem}
+  .stats .pill{display:flex;align-items:center;gap:5px;background:rgba(0,0,0,.16);padding:4px 11px;border-radius:20px}
+  .stats .heart{font-size:1.1rem;filter:drop-shadow(0 1px 1px rgba(0,0,0,.25))}
+
+  /* pond = camera viewport */
+  .pond{position:relative;height:600px;overflow:hidden;
+    background:
+      radial-gradient(ellipse at 20% 12%, rgba(255,255,255,.26), transparent 36%),
+      radial-gradient(ellipse at 82% 80%, rgba(255,255,255,.15), transparent 42%),
+      linear-gradient(180deg,var(--water1),var(--water2) 70%,var(--water3))}
+  .pond::before{content:"";position:absolute;inset:-20%;pointer-events:none;z-index:1;
+    background:repeating-linear-gradient(115deg,transparent 0 28px,rgba(255,255,255,.05) 28px 33px),
+               repeating-linear-gradient(65deg,transparent 0 40px,rgba(255,255,255,.035) 40px 46px);
+    animation:flow 12s linear infinite}
+  @keyframes flow{to{transform:translate(34px,18px)}}
+  .water-noise{position:absolute;inset:0;width:100%;height:100%;z-index:1;opacity:.5;mix-blend-mode:screen;pointer-events:none}
+
+  /* the scrolling world (moved by the camera) */
+  #world{position:absolute;left:0;top:0;width:100%;z-index:2;will-change:transform}
+
+  /* goal bank at the far side */
+  #goal{position:absolute;left:0;width:100%;height:140px;
+    background:linear-gradient(180deg,#7fce4f,#4a9e22 70%,#3a7d1c);
+    border-radius:0 0 50% 50%/0 0 30px 30px;display:flex;align-items:center;justify-content:center;
+    gap:10px;color:#fff;font-weight:bold;font-size:1.3rem;text-shadow:0 2px 3px rgba(0,0,0,.3);box-shadow:0 8px 20px rgba(0,0,0,.25)}
+
+  /* lily pads */
+  .leaf{position:absolute;width:28%;height:138px;border:none;cursor:pointer;font-family:inherit;
+    padding:0;background:none;transition:transform .16s ease, filter .16s;
+    filter:drop-shadow(0 7px 6px rgba(0,0,0,.30))}
+  .leaf:hover:not(:disabled){transform:scale(1.06) translateY(-3px);z-index:6}
+  .leaf:disabled{cursor:default}
+  .leaf .pad{width:100%;height:100%;position:relative;display:flex;align-items:center;justify-content:center;
+    text-align:center;padding:14px 12px;color:#fff;font-weight:bold;font-size:.8rem;line-height:1.16;
+    text-shadow:0 1px 2px rgba(0,0,0,.55);border-radius:48% 52% 50% 50%/52% 50% 50% 48%;overflow:hidden;
+    background:
+      repeating-conic-gradient(from 0deg at 50% 50%, transparent 0 6deg, rgba(190,240,150,.16) 6deg 7.5deg),
+      radial-gradient(circle at 50% 48%, #4aa540 0 24%, #36912f 52%, #2a6f22 80%, #235c1d);
+    box-shadow:0 5px 9px rgba(0,0,0,.26), inset 0 -7px 16px rgba(0,0,0,.20), inset 0 6px 12px rgba(255,255,255,.14)}
+  .leaf .pad::before{content:"";position:absolute;top:14%;left:28%;width:44%;height:24%;
+    background:radial-gradient(circle,rgba(255,255,255,.20),transparent 70%);border-radius:50%;pointer-events:none}
+  .leaf.pop .pad{animation:padpop .5s ease-out}
+  @keyframes padpop{0%{transform:scale(.5) rotate(-7deg);opacity:.2}60%{transform:scale(1.07) rotate(2deg)}100%{transform:scale(1)}}
+  .leaf .badge{position:absolute;top:-13px;left:50%;transform:translateX(-50%);z-index:2;
+    width:38px;height:38px;border-radius:50%;background:radial-gradient(circle at 35% 28%,#9ee37f,var(--bar) 72%);
+    color:#fff;font-size:1.12rem;display:grid;place-items:center;box-shadow:0 4px 8px rgba(0,0,0,.35);
+    border:3px solid #fff;text-shadow:0 1px 1px rgba(0,0,0,.3)}
+  /* locked (future) pads = blank decorative lily pads */
+  .leaf.locked{cursor:default;filter:drop-shadow(0 6px 6px rgba(0,0,0,.25))}
+  .leaf.locked .pad{background:
+      repeating-conic-gradient(from 0deg at 50% 50%, transparent 0 6deg, rgba(160,210,130,.12) 6deg 7.5deg),
+      radial-gradient(circle at 50% 48%, #3f8f37 0 24%, #2e7d28 55%, #245f1e 82%, #1f5019)}
+  .leaf.locked .badge{opacity:.35;background:radial-gradient(circle at 35% 28%,#bcdca8,#6a9a52)}
+  .leaf.correct .pad{background:radial-gradient(circle at 50% 46%,#7af0a0 0 26%,var(--right) 60%,#1e9e54 85%);
+    box-shadow:0 0 0 4px #1e8a4d,inset 0 -6px 14px rgba(0,0,0,.18)}
+  .leaf.correct{filter:drop-shadow(0 0 16px rgba(46,204,113,.9))}
+  .leaf.wrong .pad{background:radial-gradient(circle at 50% 46%,#ff9d8e 0 26%,var(--wrong) 60%,#b3271c 85%);
+    box-shadow:0 0 0 4px #a83228,inset 0 -6px 14px rgba(0,0,0,.18)}
+
+  /* start (home) pad */
+  #startPad{position:absolute;left:27%;width:46%;height:58px;border-radius:50%;
+    background:radial-gradient(ellipse at 50% 32%,#5cae3f,var(--leaf) 60%,var(--leaf-dark));
+    box-shadow:inset 0 -8px 14px rgba(0,0,0,.3),0 6px 0 rgba(0,0,0,.14)}
+
+  /* frog */
+  #frog{position:absolute;width:150px;z-index:20}
+  #frog svg{width:100%;height:auto;display:block;filter:drop-shadow(0 8px 7px rgba(0,0,0,.3))}
+  #frog.idle{animation:breathe 3s ease-in-out infinite}
+  @keyframes breathe{50%{transform:translateY(-5px)}}
+
+  /* water splash (fixed in viewport) */
+  .waterfx{position:absolute;width:0;height:0;z-index:15;pointer-events:none;top:470px;left:50%}
+  .waterfx .ring{position:absolute;left:50%;top:50%;width:160px;height:66px;margin:-33px 0 0 -80px;
+    border:3px solid rgba(255,255,255,.8);border-radius:50%;transform:scale(.12);opacity:0}
+  .waterfx.show .ring{animation:ripple 1.15s ease-out forwards}
+  .waterfx.show .ring.r2{animation-delay:.14s;border-color:rgba(255,255,255,.6)}
+  .waterfx.show .ring.r3{animation-delay:.28s;border-color:rgba(255,255,255,.45)}
+  @keyframes ripple{0%{transform:scale(.12);opacity:.95}100%{transform:scale(1.3);opacity:0}}
+  .waterfx .drop{position:absolute;left:-7px;top:-7px;width:14px;height:14px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#dff5ff,#5cc4ec 75%);box-shadow:0 0 4px rgba(255,255,255,.7);opacity:0}
+  .waterfx.show .drop{animation:droplet .8s cubic-bezier(.2,.6,.5,1) forwards}
+  @keyframes droplet{0%{opacity:0;transform:translate(0,0) scale(.6)}12%{opacity:1}55%{opacity:1}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(.4)}}
+
+  /* fixed HUD */
+  .qbox{position:absolute;top:14px;left:5%;right:5%;z-index:18;
+    background:linear-gradient(180deg,#fff,#f4fbef);border-radius:16px;padding:13px 18px;
+    box-shadow:0 8px 20px rgba(0,0,0,.30);text-align:center;border:2px solid rgba(255,255,255,.7)}
+  .qcount{position:absolute;top:0;left:0;font-size:.72rem;font-weight:bold;color:#fff;
+    background:var(--bar);padding:3px 10px;border-radius:14px 0 12px 0}
+  .qtext{font-size:1.08rem;font-weight:bold;line-height:1.3;color:#1d2b1a}
+  .tag{display:inline-block;font-size:.66rem;background:var(--leaf);color:#fff;padding:2px 9px;border-radius:20px;margin-left:6px;vertical-align:middle}
+  @media(max-width:560px){.qtext{font-size:.96rem}.leaf{height:140px}.leaf .pad{font-size:.72rem;padding:10px 8px}.leaf .badge{width:32px;height:32px;font-size:1rem}}
+
+  .banner{position:absolute;left:50%;top:92px;transform:translateX(-50%);z-index:19;min-width:60%;max-width:90%;
+    text-align:center;padding:11px 18px;border-radius:16px;font-weight:bold;font-size:.94rem;display:none;box-shadow:0 8px 20px rgba(0,0,0,.35)}
+  .banner.show{display:block;animation:bdrop .35s}
+  @keyframes bdrop{from{transform:translate(-50%,-14px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  .banner.good{background:linear-gradient(180deg,#eafff0,#d6f8e1);color:#1e8a4d;border:2px solid var(--right)}
+  .banner.bad{background:linear-gradient(180deg,#fff0f0,#fde0e0);color:#b3271c;border:2px solid var(--wrong)}
+
+  .timer{position:absolute;left:14px;bottom:14px;z-index:18;display:flex;align-items:center;gap:8px}
+  .timer .ring2{width:54px;height:54px;border-radius:50%;background:#fff;display:grid;place-items:center;
+    font-weight:bold;color:var(--bar-dark);font-size:1rem;box-shadow:0 5px 12px rgba(0,0,0,.35);border:4px solid var(--bar)}
+  .timer.low .ring2{border-color:var(--wrong);color:var(--wrong);animation:pulse .8s infinite}
+  @keyframes pulse{50%{transform:scale(1.09)}}
+  .timer .lbl{background:rgba(0,0,0,.28);color:#fff;font-size:.74rem;padding:4px 9px;border-radius:20px;font-weight:bold}
+
+  /* progress dots */
+  .progress{position:absolute;right:14px;bottom:16px;z-index:18;display:flex;gap:6px}
+  .progress i{width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.4);box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .progress i.done{background:var(--gold)}
+
+  /* overlays */
+  .overlay{position:absolute;inset:0;z-index:40;
+    background:radial-gradient(circle at 50% 35%,rgba(28,127,192,.82),rgba(16,70,105,.93));
+    color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px 26px;backdrop-filter:blur(3px)}
+  .overlay.hidden{display:none}
+  .overlay .big{font-size:4.6rem;animation:bob 2.4s ease-in-out infinite;filter:drop-shadow(0 8px 10px rgba(0,0,0,.35))}
+  @keyframes bob{50%{transform:translateY(-14px)}}
+  .overlay h2{font-size:1.7rem;margin:10px 0;text-shadow:0 2px 4px rgba(0,0,0,.3)}
+  .overlay p{max-width:440px;line-height:1.45;margin:6px 0;font-size:1rem;opacity:.96}
+  .play-btn{margin-top:22px;background:linear-gradient(180deg,#ffe27a,var(--gold));color:#5a3d00;border:none;
+    padding:15px 46px;border-radius:34px;font-size:1.18rem;font-weight:bold;cursor:pointer;font-family:inherit;box-shadow:0 6px 0 #c9a227}
+  .play-btn:active{transform:translateY(3px);box-shadow:0 3px 0 #c9a227}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="logo"><span class="dot">🐸</span> frogplay</div>
+    <div class="title">AI Legal Assistant · River Quiz</div>
+    <div class="stats">
+      <div class="pill"><span class="heart">❤️</span> <span id="lives">2</span></div>
+      <div class="pill">🍃 <span id="crossed">0</span></div>
+    </div>
+  </div>
+
+  <div class="pond" id="pond">
+    <svg class="water-noise" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <filter id="waterNoise"><feTurbulence type="turbulence" baseFrequency="0.018 0.022" numOctaves="2" seed="6" stitchTiles="stitch"/>
+        <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.55 0 0 0 0"/></filter>
+      <rect width="100%" height="100%" filter="url(#waterNoise)"/>
+    </svg>
+
+    <div id="world">
+      <div id="goal">🏁 Finish 🏁</div>
+      <div id="pads"></div>
+      <div id="startPad"></div>
+      <div id="frog" class="idle">
+        <svg viewBox="0 0 240 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <radialGradient id="fBody" cx="42%" cy="24%" r="84%"><stop offset="0" stop-color="#9bdb6f"/><stop offset="50%" stop-color="#62b545"/><stop offset="100%" stop-color="#3f8a2c"/></radialGradient>
+            <linearGradient id="fLeg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6cbd4c"/><stop offset="1" stop-color="#3c8528"/></linearGradient>
+            <radialGradient id="fBelly" cx="50%" cy="30%" r="75%"><stop offset="0" stop-color="#f5f8d8"/><stop offset="60%" stop-color="#e3edb1"/><stop offset="100%" stop-color="#c9d98a"/></radialGradient>
+            <radialGradient id="fEye" cx="50%" cy="34%" r="68%"><stop offset="0" stop-color="#ffffff"/><stop offset="100%" stop-color="#dfeede"/></radialGradient>
+          </defs>
+          <ellipse cx="120" cy="188" rx="80" ry="11" fill="#10456b" opacity=".22"/>
+          <ellipse cx="54" cy="150" rx="35" ry="42" fill="url(#fLeg)"/>
+          <ellipse cx="186" cy="150" rx="35" ry="42" fill="url(#fLeg)"/>
+          <g fill="#56a83c"><ellipse cx="22" cy="182" rx="11" ry="17" transform="rotate(-26 22 182)"/><ellipse cx="40" cy="186" rx="11" ry="18"/><ellipse cx="58" cy="182" rx="11" ry="17" transform="rotate(26 58 182)"/></g>
+          <g fill="#56a83c"><ellipse cx="218" cy="182" rx="11" ry="17" transform="rotate(26 218 182)"/><ellipse cx="200" cy="186" rx="11" ry="18"/><ellipse cx="182" cy="182" rx="11" ry="17" transform="rotate(-26 182 182)"/></g>
+          <ellipse cx="120" cy="118" rx="74" ry="66" fill="url(#fBody)"/>
+          <circle cx="78" cy="92" r="7" fill="#347a23" opacity=".4"/><circle cx="162" cy="100" r="8" fill="#347a23" opacity=".4"/><circle cx="134" cy="80" r="6" fill="#347a23" opacity=".35"/><circle cx="96" cy="128" r="6" fill="#347a23" opacity=".3"/>
+          <ellipse cx="120" cy="134" rx="42" ry="46" fill="url(#fBelly)"/><ellipse cx="108" cy="118" rx="14" ry="18" fill="#fdffe9" opacity=".5"/>
+          <g fill="#56a83c"><ellipse cx="86" cy="182" rx="9" ry="6" transform="rotate(-16 86 182)"/><ellipse cx="100" cy="185" rx="9" ry="6"/><ellipse cx="114" cy="183" rx="9" ry="6" transform="rotate(14 114 183)"/></g>
+          <g fill="#56a83c"><ellipse cx="154" cy="182" rx="9" ry="6" transform="rotate(16 154 182)"/><ellipse cx="140" cy="185" rx="9" ry="6"/><ellipse cx="126" cy="183" rx="9" ry="6" transform="rotate(-14 126 183)"/></g>
+          <circle cx="84" cy="62" r="31" fill="url(#fBody)"/><circle cx="156" cy="62" r="31" fill="url(#fBody)"/>
+          <circle cx="84" cy="60" r="20" fill="url(#fEye)"/><circle cx="156" cy="60" r="20" fill="url(#fEye)"/>
+          <circle cx="88" cy="64" r="10" fill="#15301d"/><circle cx="152" cy="64" r="10" fill="#15301d"/>
+          <circle cx="92" cy="60" r="3.6" fill="#fff"/><circle cx="156" cy="60" r="3.6" fill="#fff"/>
+          <ellipse cx="112" cy="86" rx="2.4" ry="3" fill="#2c5e1f"/><ellipse cx="128" cy="86" rx="2.4" ry="3" fill="#2c5e1f"/>
+          <circle cx="72" cy="104" r="9" fill="#f2a0c4" opacity=".5"/><circle cx="168" cy="104" r="9" fill="#f2a0c4" opacity=".5"/>
+          <path d="M82 100 q38 30 76 0" stroke="#2c5e1f" stroke-width="5" fill="none" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="waterfx" id="waterfx">
+      <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span>
+      <span class="drop" style="--tx:-48px;--ty:-60px"></span><span class="drop" style="--tx:-26px;--ty:-78px"></span>
+      <span class="drop" style="--tx:6px;--ty:-86px"></span><span class="drop" style="--tx:32px;--ty:-76px"></span>
+      <span class="drop" style="--tx:54px;--ty:-56px"></span><span class="drop" style="--tx:-60px;--ty:-34px"></span><span class="drop" style="--tx:64px;--ty:-30px"></span>
+    </div>
+
+    <div class="qbox"><span class="qcount" id="qcount">1 / 4</span><div class="qtext" id="qtext"></div></div>
+    <div class="banner" id="banner"></div>
+    <div class="timer" id="timer"><div class="ring2" id="ring2">5:00</div><div class="lbl">⏱ time</div></div>
+    <div class="progress" id="progress"></div>
+
+    <div class="overlay" id="start">
+      <div class="big">🐸</div>
+      <h2>Cross the river!</h2>
+      <p>The frog hops from lily pad to lily pad. Tap the <strong>correct answer</strong> and it leaps onto that pad as the camera follows you upstream — new pads keep appearing ahead.</p>
+      <p>Tap a <strong>wrong</strong> pad and it <strong>splashes</strong> 💦 into the water and loses a life.</p>
+      <p><strong>4 questions · 2 lives ❤️❤️</strong></p>
+      <button class="play-btn" onclick="startGame()">▶ Start</button>
+    </div>
+
+    <div class="overlay hidden" id="end">
+      <div class="big" id="endEmoji">🏆</div>
+      <h2 id="endTitle"></h2>
+      <p id="endMsg"></p>
+      <button class="play-btn" onclick="resetGame()">↻ Play again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== data ===== */
+const QUESTIONS=[
+  {q:"What is the main purpose of the AI-Powered Legal Assistant?",
+   options:["Replace lawyers completely","Improve efficiency, accessibility, and productivity in legal practice","Eliminate legal services","Replace courts and judges","Reduce legal information"],answer:1},
+  {q:"According to the project, AI should function as:",
+   options:["An autonomous decision-maker","A judge","A law firm manager","A support tool","A legal authority"],answer:3},
+  {q:"What is one of the main challenges faced by law firms?",
+   options:["Too many legal resources","Excessive accessibility","Time-consuming document review processes","Too much automation","Too much productivity"],answer:2},
+  {q:"What must law firms protect when using Artificial Intelligence?",
+   options:["Advertising campaigns","Office equipment","Market opportunities","Social media accounts","Confidential client information"],answer:4},
+  {q:"According to the project, who must remain responsible for final legal decisions?",
+   options:["Artificial Intelligence","The software","The computer system","The client","The human lawyer"],answer:4}
+];
+
+/* ===== world / camera constants ===== */
+const LEVELS=QUESTIONS.length;
+const BAND=250, BASE=1850;
+const START_OFFSET=120;           // frog starts this far below cluster-0
+const START_PAD_TOP=BASE+START_OFFSET;
+const WORLD_H=START_PAD_TOP+280;
+const CAM_P=360;                  // screen-y where each cluster's bandTop is pinned
+const LETTERS=['A','B','C','D','E'];
+const bandTop=i=>BASE-i*BAND;     // anchor line for cluster i (just below its fan)
+/* fan / cone of 5 pads opening down toward the frog: A & E low-outer, B & D mid, C top-center */
+const FAN_LEFT=['-1%','15.5%','35%','54.5%','71%'];
+const FAN_TOP =[70,165,240,165,70]; // px above bandTop (arc: center highest)
+const FAN_MAX =Math.max(...FAN_TOP);
+
+/* ===== state ===== */
+let currentLevel=0, lives=2, locked=true, timeLeft=300, timerId=null;
+let clusterPads=[], frogRestPad=null;
+const $=id=>document.getElementById(id);
+const world=$('world'), frog=$('frog'), startPad=$('startPad'), goal=$('goal');
+
+/* ===== build the river world ===== */
+function buildWorld(){
+  world.style.height=WORLD_H+'px';
+  startPad.style.top=START_PAD_TOP+'px';
+  goal.style.top=(bandTop(LEVELS-1)-FAN_MAX-220)+'px';
+
+  const pads=$('pads'); pads.innerHTML=''; clusterPads=[];
+  for(let i=0;i<LEVELS;i++){
+    const row=[];
+    for(let k=0;k<FAN_LEFT.length;k++){
+      const top=bandTop(i)-FAN_TOP[k];
+      const b=document.createElement('button');
+      b.className='leaf locked';
+      b.style.top=top+'px'; b.style.left=FAN_LEFT[k];
+      b.innerHTML=`<span class="badge">${LETTERS[k]}</span><div class="pad"></div>`;
+      b.onclick=()=>choose(i,k,b);
+      pads.appendChild(b);
+      row.push(b);
+    }
+    clusterPads.push(row);
+  }
+
+  const pr=$('progress'); pr.innerHTML='';
+  for(let i=0;i<LEVELS;i++){const d=document.createElement('i');pr.appendChild(d);}
+}
+
+/* ===== camera (pinned to the active cluster, not the frog) ===== */
+function setCameraToLevel(level,animate){
+  const cam=CAM_P-bandTop(level);
+  world.style.transition=animate?'transform .8s cubic-bezier(.38,.85,.42,1)':'none';
+  world.style.transform=`translateY(${cam}px)`;
+}
+function setCameraY(worldY,screenY,animate){
+  world.style.transition=animate?'transform .9s ease':'none';
+  world.style.transform=`translateY(${screenY-worldY}px)`;
+}
+
+/* place the frog sitting on a pad/home (world coords) */
+function sitFrogOn(el){
+  frog.getAnimations().forEach(a=>a.cancel());
+  frog.style.transform=''; frog.style.opacity='1';
+  frog.style.left=(el.offsetLeft+el.offsetWidth/2-frog.offsetWidth/2)+'px';
+  frog.style.top=(el.offsetTop+el.offsetHeight/2-frog.offsetHeight*0.66)+'px';
+  frog.classList.add('idle');
+}
+
+/* ===== questions ===== */
+function clearBanner(){const b=$('banner');b.className='banner';b.innerHTML='';}
+
+function activateLevel(i,pop){
+  clearBanner();
+  $('qcount').textContent=`${i+1} / ${LEVELS}`;
+  $('qtext').innerHTML=QUESTIONS[i].q+(QUESTIONS[i].tag?`<span class="tag">${QUESTIONS[i].tag}</span>`:'');
+  clusterPads[i].forEach((b,k)=>{
+    b.classList.remove('locked','correct','wrong','pop');
+    b.querySelector('.pad').textContent=QUESTIONS[i].options[k];
+    b.disabled=false;
+    if(pop){void b.offsetWidth; b.classList.add('pop');}
+  });
+}
+
+/* ===== game flow ===== */
+function startGame(){
+  $('start').classList.add('hidden'); $('end').classList.add('hidden');
+  lives=2; currentLevel=0; timeLeft=300; locked=false;
+  $('lives').textContent=lives; $('crossed').textContent='0';
+  clearBanner();
+  buildWorld();
+  // run setup synchronously (rAF can be throttled when the tab isn't rendering)
+  sitFrogOn(startPad); frogRestPad=startPad;
+  setCameraToLevel(0,false);
+  activateLevel(0,true);
+  [...$('progress').children].forEach(d=>d.classList.remove('done'));
+  startTimer();
+}
+
+function startTimer(){clearInterval(timerId);updateTimer();
+  timerId=setInterval(()=>{timeLeft--;updateTimer();if(timeLeft<=0){clearInterval(timerId);endGame('time');}},1000);}
+function updateTimer(){const m=Math.floor(timeLeft/60),s=timeLeft%60;
+  $('ring2').textContent=m+':'+String(s).padStart(2,'0');$('timer').classList.toggle('low',timeLeft<=30);}
+
+/* arc-hop the frog onto a pad; returns the WAAPI animation + end transform */
+function hopFrog(padEl){
+  frog.classList.remove('idle');
+  const fr=frog.getBoundingClientRect(), pr=padEl.getBoundingClientRect();
+  const dx=(pr.left+pr.width/2)-(fr.left+fr.width/2);
+  const dy=(pr.top+pr.height*0.30)-(fr.top+fr.height/2);
+  const end=`translate(${dx}px,${dy}px) scale(.92)`;
+  const a=frog.animate([
+    {transform:'translate(0,0) scale(1)'},
+    {transform:`translate(${dx*0.5}px,${dy*0.5-120}px) scale(1.09)`,offset:.5},
+    {transform:end}
+  ],{duration:600,easing:'cubic-bezier(.3,.7,.4,1)',fill:'forwards'});
+  return {a,end,dx,dy};
+}
+
+function triggerWater(screenX){
+  const w=$('waterfx');
+  w.style.left=screenX+'px';
+  w.classList.remove('show'); void w.offsetWidth; w.classList.add('show');
+}
+
+function choose(level,k,padEl){
+  if(locked||level!==currentLevel)return;
+  locked=true;
+  clusterPads[level].forEach(b=>b.disabled=true);
+  const correct=QUESTIONS[level].answer;
+  const b=$('banner');
+
+  if(k===correct){
+    padEl.classList.add('correct');
+    const {a}=hopFrog(padEl);
+    b.className='banner good show'; b.innerHTML='✅ Correct! Hop forward!';
+    a.onfinish=()=>{
+      sitFrogOn(padEl); frogRestPad=padEl;
+      $('progress').children[level].classList.add('done');
+      $('crossed').textContent=level+1;
+      currentLevel++;
+      if(currentLevel>=LEVELS){ winSequence(); return; }
+      setCameraToLevel(currentLevel,true);           // camera pans to the next cluster
+      setTimeout(()=>{ activateLevel(currentLevel,true); locked=false; },820);
+    };
+  }else{
+    padEl.classList.add('wrong');
+    lives--; $('lives').textContent=lives;
+    const {a,end,dx}=hopFrog(padEl);
+    b.className='banner bad show'; b.innerHTML='💦 Splash! Wrong pad!';
+    a.onfinish=()=>{
+      // tumble into the water
+      frog.animate([
+        {transform:end,opacity:1},
+        {transform:`translate(${dx}px,40px) rotate(150deg)`,opacity:1,offset:.45},
+        {transform:`translate(${dx*0.5}px,180px) rotate(430deg)`,opacity:0}
+      ],{duration:720,easing:'ease-in',fill:'forwards'});
+      const pr=padEl.getBoundingClientRect(), pondR=$('pond').getBoundingClientRect();
+      triggerWater(pr.left+pr.width/2-pondR.left);
+      setTimeout(()=>{
+        if(lives<=0){ endGame('lose'); return; }
+        b.innerHTML+=`<br>🐸 ${lives} life${lives===1?'':'s'} left — try again!`;
+        padEl.classList.remove('wrong');
+        sitFrogOn(frogRestPad);                       // climb back to last safe pad
+        clusterPads[currentLevel].forEach(p=>p.disabled=false);
+        locked=false;
+      },1050);
+    };
+  }
+}
+
+function winSequence(){
+  setCameraY(parseFloat(goal.style.top)+70,260,true); // pan up to the finish bank
+  setTimeout(()=>endGame('win'),950);
+}
+
+function endGame(result){
+  clearInterval(timerId); locked=true;
+  clusterPads.forEach(row=>row.forEach(b=>b.disabled=true));
+  const e=$('end');
+  if(result==='win'){$('endEmoji').textContent='🏆';$('endTitle').textContent='You reached the far bank!';
+    $('endMsg').innerHTML='🌟 The frog crossed the whole river <strong>completely dry</strong>. You know the AI Legal Assistant project!';}
+  else if(result==='lose'){$('endEmoji').textContent='💧';$('endTitle').textContent='Game Over';
+    $('endMsg').innerHTML='The frog ran out of lives and got soaked. 🐸💦<br>Review and try crossing again!';}
+  else{$('endEmoji').textContent='⏰';$('endTitle').textContent="Time's up!";
+    $('endMsg').innerHTML='The clock ran out before the frog reached the other side. Try again!';}
+  e.classList.remove('hidden');
+}
+
+function resetGame(){$('end').classList.add('hidden');$('start').classList.remove('hidden');}
+</script>
+</body>
+</html>
